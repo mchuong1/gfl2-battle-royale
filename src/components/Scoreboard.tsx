@@ -26,9 +26,11 @@ export function Scoreboard({ bots, tick }: ScoreboardProps) {
             key={bot.id}
             className={`scoreboard-row ${bot.alive ? 'alive' : 'dead'}`}
           >
-            <span
-              className="scoreboard-dot"
-              style={{ backgroundColor: bot.color }}
+            <img
+              className="scoreboard-portrait"
+              src={bot.image}
+              alt={bot.name}
+              style={{ borderColor: bot.color }}
             />
             <span className="scoreboard-name">{bot.name}</span>
             {bot.alive ? (

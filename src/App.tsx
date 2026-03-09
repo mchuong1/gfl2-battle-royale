@@ -7,7 +7,7 @@ import { EventLog } from './components/EventLog';
 import { Scoreboard } from './components/Scoreboard';
 import { createSimulation, stepSimulation } from './simulation';
 import { useRecorder } from './hooks/useRecorder';
-import type { SimulationState } from './types';
+import type { BotConfig, SimulationState } from './types';
 
 type Phase = 'setup' | 'battle';
 
@@ -77,7 +77,7 @@ function App() {
   }, [simState?.finished]);
 
   const handleStart = useCallback(
-    (names: string[]) => {
+    (bots: BotConfig[]) => {
       // Stop any in-progress recording from a previous battle
       stopRecording();
       resetReady();
@@ -89,7 +89,7 @@ function App() {
         rafRef.current = null;
       }
 
-      const initial = createSimulation(names);
+      const initial = createSimulation(bots);
       const running = { ...initial, running: true };
       stateRef.current = running;
       setSimState(running);
@@ -120,8 +120,8 @@ function App() {
 
   const handleRestart = useCallback(() => {
     if (!stateRef.current) return;
-    const names = stateRef.current.bots.map((b) => b.name);
-    handleStart(names);
+    const bots: BotConfig[] = stateRef.current.bots.map((b) => ({ name: b.name, image: b.image }));
+    handleStart(bots);
   }, [handleStart]);
 
   if (phase === 'setup') {

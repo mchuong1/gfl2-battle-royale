@@ -1,4 +1,4 @@
-import type { Bot, GameEvent, SimulationState } from './types';
+import type { Bot, BotConfig, GameEvent, SimulationState } from './types';
 
 const CANVAS_WIDTH = 700;
 const CANVAS_HEIGHT = 700;
@@ -35,20 +35,21 @@ function getCombatRange(botRadius: number): number {
   return botRadius * 2 + 6;
 }
 
-export function createSimulation(names: string[]): SimulationState {
+export function createSimulation(botConfigs: BotConfig[]): SimulationState {
   const arenaX = CANVAS_WIDTH / 2;
   const arenaY = CANVAS_HEIGHT / 2;
-  const botRadius = getBotRadius(names.length);
+  const botRadius = getBotRadius(botConfigs.length);
   const combatRange = getCombatRange(botRadius);
   const spread = ARENA_RADIUS - botRadius - 20;
 
-  const bots: Bot[] = names.map((name, i) => {
+  const bots: Bot[] = botConfigs.map((cfg, i) => {
     // Spread bots around so they don't all start stacked
-    const angle = (Math.PI * 2 * i) / names.length + randomInRange(-0.3, 0.3);
+    const angle = (Math.PI * 2 * i) / botConfigs.length + randomInRange(-0.3, 0.3);
     const r = randomInRange(spread * 0.2, spread * 0.85);
     return {
       id: `bot_${i}`,
-      name,
+      name: cfg.name,
+      image: cfg.image,
       x: arenaX + Math.cos(angle) * r,
       y: arenaY + Math.sin(angle) * r,
       vx: randomInRange(-1, 1),

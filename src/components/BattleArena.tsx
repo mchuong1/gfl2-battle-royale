@@ -1,4 +1,5 @@
 import { useRef, useEffect, useCallback } from 'react';
+import type { RefObject } from 'react';
 import type { SimulationState } from '../types';
 
 interface BattleArenaProps {
@@ -11,7 +12,18 @@ const CANVAS_SIZE = 700;
 export function BattleArena({ state, canvasRef: externalRef }: BattleArenaProps) {
   const internalRef = useRef<HTMLCanvasElement>(null);
   const canvasRef = externalRef ?? internalRef;
+  const imgCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
 
+  // Preload portrait images whenever the bot list changes
+  useEffect(() => {
+    for (const bot of state.bots) {
+      if (!imgCacheRef.current.has(bot.image)) {
+        const img = new Image();
+        img.src = bot.image;
+        imgCacheRef.current.set(bot.image, img);
+      }
+    }
+  }, [state.bots]);
   const draw = useCallback((s: SimulationState) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -108,17 +120,26 @@ export function BattleArena({ state, canvasRef: externalRef }: BattleArenaProps)
       ctx.fillStyle = glow;
       ctx.fill();
 
-      // Bot body
+      // Bot body (ring/background)
       ctx.beginPath();
       ctx.arc(x, y, botRadius, 0, Math.PI * 2);
-
       if (isFlashing) {
-        // White flash on attack
         ctx.fillStyle = '#ffffff';
       } else {
         ctx.fillStyle = bot.color;
       }
       ctx.fill();
+
+      // Portrait clipped inside circle
+      const img = imgCacheRef.current.get(bot.image);
+      if (!isFlashing && img && img.complete && img.naturalWidth > 0) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x, y, botRadius, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(img, x - botRadius, y - botRadius, botRadius * 2, botRadius * 2);
+        ctx.restore();
+      }
 
       // Bot border
       ctx.strokeStyle = isFlashing ? '#ffff00' : 'rgba(255,255,255,0.5)';
@@ -195,7 +216,7 @@ export function BattleArena({ state, canvasRef: externalRef }: BattleArenaProps)
 
   return (
     <canvas
-      ref={canvasRef}
+      ref={canvasRef as RefObject<HTMLCanvasElement>}
       width={CANVAS_SIZE}
       height={CANVAS_SIZE}
       className="battle-canvas"
