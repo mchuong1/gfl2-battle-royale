@@ -1,0 +1,143 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #0f0f1a;
+  color: #e0e0e0;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  padding: 24px 16px;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  max-width: 1100px;
+  width: 100%;
+}
+
+.title {
+  font-size: 2rem;
+  color: #f39c12;
+  text-shadow: 0 0 20px rgba(243, 156, 18, 0.4);
+}
+
+.subtitle {
+  color: #888;
+  font-size: 0.9rem;
+  margin-top: -8px;
+}
+
+.layout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* Controls */
+.controls {
+  background: #16213e;
+  border: 1px solid #0f3460;
+  border-radius: 8px;
+  padding: 20px;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.control-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.control-row label {
+  font-size: 0.95rem;
+  color: #ccc;
+}
+
+.control-row input[type="range"] {
+  width: 100%;
+  accent-color: #f39c12;
+  cursor: pointer;
+}
+
+.control-row input[type="range"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.buttons {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.btn:hover:not(:disabled) {
+  opacity: 0.85;
+  transform: translateY(-1px);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-start {
+  background: #2ecc71;
+  color: #111;
+}
+
+.btn-pause {
+  background: #f39c12;
+  color: #111;
+}
+
+.btn-reset {
+  background: #e74c3c;
+  color: #fff;
+}
+
+.btn-export {
+  background: #3498db;
+  color: #fff;
+}
+
+.btn-export-stop {
+  background: #9b59b6;
+  color: #fff;
+}
+
+.winner-banner {
+  padding: 12px 16px;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: bold;
+  color: #fff;
+  text-align: center;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+}
+
+.winner-banner.draw {
+  background: #555;
+}
