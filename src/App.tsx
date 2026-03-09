@@ -24,6 +24,9 @@ function App() {
   // Recording
   const arenaCanvasRef = useRef<HTMLCanvasElement>(null);
   const recordingCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const handleRecordingCanvas = useCallback((canvas: HTMLCanvasElement) => {
+    recordingCanvasRef.current = canvas;
+  }, []);
   const { isRecording, isReady, startRecording, stopRecording, scheduleStop, downloadRecording, resetReady } =
     useRecorder();
 
@@ -73,8 +76,7 @@ function App() {
     if (simState?.finished) {
       scheduleStop(2500);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [simState?.finished]);
+  }, [simState?.finished, scheduleStop]);
 
   const handleStart = useCallback(
     (bots: BotConfig[]) => {
@@ -182,7 +184,7 @@ function App() {
       <RecordingCanvas
         arenaCanvas={arenaCanvasRef.current}
         state={simState}
-        onCanvas={(canvas) => { recordingCanvasRef.current = canvas; }}
+        onCanvas={handleRecordingCanvas}
       />
     </div>
   );

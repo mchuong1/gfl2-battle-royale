@@ -242,14 +242,6 @@
   50%       { opacity: 0.4; }
 }
 
-.rec-saved {
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: #44dd88;
-  white-space: nowrap;
-}
-
 .battle-controls {
   display: flex;
   gap: 8px;

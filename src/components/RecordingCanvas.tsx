@@ -17,11 +17,10 @@ const PANEL_W = CANVAS_W - PANEL_X;
 export function RecordingCanvas({ arenaCanvas, state, onCanvas }: RecordingCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Notify parent about the canvas element once on mount
+  // Notify parent about the canvas element; re-runs if onCanvas identity changes
   useEffect(() => {
     if (canvasRef.current) onCanvas(canvasRef.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [onCanvas]);
 
   // Redraw composite every time the state changes
   useEffect(() => {

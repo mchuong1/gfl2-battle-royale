@@ -1,6 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import type { BotConfig } from '../types';
 
+interface SelectedBot extends BotConfig {
+  id: string;
+}
+
 // ---------------------------------------------------------------------------
 // Character catalogue – derived from filenames in public/images/
 // ---------------------------------------------------------------------------
@@ -52,7 +56,7 @@ interface BotSetupProps {
 }
 
 export function BotSetup({ onStart }: BotSetupProps) {
-  const [selected, setSelected] = useState<BotConfig[]>([]);
+  const [selected, setSelected] = useState<SelectedBot[]>([]);
   const [search, setSearch] = useState('');
   // swapIdx: index in `selected` whose portrait is being swapped; null = picker closed
   const [swapIdx, setSwapIdx] = useState<number | null>(null);
@@ -76,7 +80,7 @@ export function BotSetup({ onStart }: BotSetupProps) {
 
   const addCharacter = (char: CharacterEntry) => {
     if (selected.length >= MAX_BOTS) return;
-    setSelected((prev) => [...prev, { name: char.name, image: char.image }]);
+    setSelected((prev) => [...prev, { id: crypto.randomUUID(), name: char.name, image: char.image }]);
   };
 
   const removeSelected = (idx: number) => {
@@ -104,7 +108,7 @@ export function BotSetup({ onStart }: BotSetupProps) {
       [pool[i], pool[j]] = [pool[j], pool[i]];
     }
     const picks = pool.slice(0, slots);
-    setSelected((prev) => [...prev, ...picks.map((c) => ({ name: c.name, image: c.image }))]);
+    setSelected((prev) => [...prev, ...picks.map((c) => ({ id: crypto.randomUUID(), name: c.name, image: c.image }))]);
   };
 
   const canStart = selected.length >= MIN_BOTS && selected.every((b) => b.name.trim().length > 0);
@@ -191,7 +195,7 @@ export function BotSetup({ onStart }: BotSetupProps) {
               <p className="selected-empty">← Click a character to add them</p>
             )}
             {selected.map((bot, idx) => (
-              <div key={idx} className="selected-row">
+              <div key={bot.id} className="selected-row">
                 <span className="selected-row-num">{idx + 1}</span>
                 {/* Portrait – click to open swap picker */}
                 <div className="selected-portrait-wrap">
@@ -250,7 +254,7 @@ export function BotSetup({ onStart }: BotSetupProps) {
 
           <button
             className="btn btn-start"
-            onClick={() => onStart(selected.map((b) => ({ ...b, name: b.name.trim() })))}
+            onClick={() => onStart(selected.map(({ id: _id, ...b }) => ({ ...b, name: b.name.trim() })))}
             disabled={!canStart}
           >
             🚀 Start Battle!

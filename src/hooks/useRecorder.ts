@@ -7,8 +7,10 @@ export function useRecorder() {
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const blobRef = useRef<Blob | null>(null);
-  const mimeTypeRef = useRef<string>('video/webm');
   const stopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Monotonically-increasing counter; each recording session gets its own ID.
+  // onstop checks that the session hasn't been superseded before writing state.
+  const sessionIdRef = useRef(0);
 
   const startRecording = useCallback((canvas: HTMLCanvasElement) => {
     if (mediaRecorderRef.current) return;
@@ -16,12 +18,13 @@ export function useRecorder() {
     blobRef.current = null;
     setIsReady(false);
 
+    const sessionId = ++sessionIdRef.current;
+
     const stream = canvas.captureStream(30);
     streamRef.current = stream;
     const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
       ? 'video/webm;codecs=vp9'
       : 'video/webm';
-    mimeTypeRef.current = mimeType;
 
     const recorder = new MediaRecorder(stream, { mimeType });
 
@@ -32,10 +35,14 @@ export function useRecorder() {
     recorder.onstop = () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
-      blobRef.current = new Blob(chunksRef.current, { type: mimeType });
+      mediaRecorderRef.current = null;
+      // Guard against a new session starting before this onstop fires.
+      if (sessionIdRef.current !== sessionId) return;
+      // Use recorder.mimeType — the type the browser actually negotiated,
+      // which may differ from (or be a superset of) the requested mimeType.
+      blobRef.current = new Blob(chunksRef.current, { type: recorder.mimeType || mimeType });
       setIsRecording(false);
       setIsReady(true);
-      mediaRecorderRef.current = null;
     };
 
     recorder.start(100); // collect a chunk every 100 ms

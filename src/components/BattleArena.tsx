@@ -4,7 +4,7 @@ import type { SimulationState } from '../types';
 
 interface BattleArenaProps {
   state: SimulationState;
-  canvasRef?: RefObject<HTMLCanvasElement>;
+  canvasRef?: RefObject<HTMLCanvasElement | null>;
 }
 
 const CANVAS_SIZE = 700;
@@ -14,7 +14,9 @@ export function BattleArena({ state, canvasRef: externalRef }: BattleArenaProps)
   const canvasRef = externalRef ?? internalRef;
   const imgCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
 
-  // Preload portrait images whenever the bot list changes
+  // Preload portrait images; derive a stable key so this only runs when the
+  // set of image URLs actually changes, not on every tick.
+  const imageUrlKey = [...new Set(state.bots.map((b) => b.image))].sort().join('|');
   useEffect(() => {
     for (const bot of state.bots) {
       if (!imgCacheRef.current.has(bot.image)) {
@@ -23,7 +25,8 @@ export function BattleArena({ state, canvasRef: externalRef }: BattleArenaProps)
         imgCacheRef.current.set(bot.image, img);
       }
     }
-  }, [state.bots]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imageUrlKey]);
   const draw = useCallback((s: SimulationState) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
