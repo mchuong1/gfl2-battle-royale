@@ -28,6 +28,7 @@
 .btn-secondary { background: #2d2d44; color: #ccc; }
 .btn-danger    { background: #c0392b; color: #fff; }
 .btn-warning   { background: #e67e22; color: #fff; }
+.btn-export    { background: #1a7a4a; color: #fff; }
 .btn-start {
   display: block;
   width: 100%;
@@ -211,6 +212,12 @@
   gap: 12px;
 }
 
+.battle-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .battle-title {
   font-size: 1.6rem;
   font-weight: 800;
@@ -219,6 +226,28 @@
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+.rec-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #ff4455;
+  animation: rec-pulse 1.2s ease-in-out infinite;
+  white-space: nowrap;
+}
+
+@keyframes rec-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+.rec-saved {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #44dd88;
+  white-space: nowrap;
 }
 
 .battle-controls {

@@ -3,12 +3,14 @@ import type { SimulationState } from '../types';
 
 interface BattleArenaProps {
   state: SimulationState;
+  canvasRef?: React.RefObject<HTMLCanvasElement | null>;
 }
 
 const CANVAS_SIZE = 700;
 
-export function BattleArena({ state }: BattleArenaProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+export function BattleArena({ state, canvasRef: externalRef }: BattleArenaProps) {
+  const internalRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = externalRef ?? internalRef;
 
   const draw = useCallback((s: SimulationState) => {
     const canvas = canvasRef.current;

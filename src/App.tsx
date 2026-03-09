@@ -2,9 +2,11 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import './App.css';
 import { BotSetup } from './components/BotSetup';
 import { BattleArena } from './components/BattleArena';
+import { RecordingCanvas } from './components/RecordingCanvas';
 import { EventLog } from './components/EventLog';
 import { Scoreboard } from './components/Scoreboard';
 import { createSimulation, stepSimulation } from './simulation';
+import { useRecorder } from './hooks/useRecorder';
 import type { SimulationState } from './types';
 
 type Phase = 'setup' | 'battle';
@@ -18,6 +20,12 @@ function App() {
   const rafRef = useRef<number | null>(null);
   const lastTickRef = useRef<number>(0);
   const activeRef = useRef<boolean>(false);
+
+  // Recording
+  const arenaCanvasRef = useRef<HTMLCanvasElement>(null);
+  const recordingCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const { isRecording, isReady, startRecording, stopRecording, scheduleStop, downloadRecording, resetReady } =
+    useRecorder();
 
   // Animation loop – lives entirely in an effect so no ref is mutated during render
   useEffect(() => {
@@ -49,20 +57,46 @@ function App() {
     };
   }, [phase]);
 
-  const handleStart = useCallback((names: string[]) => {
-    // Stop any existing loop before switching phase
-    activeRef.current = false;
-    if (rafRef.current !== null) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-    }
+  // Start recording 200 ms after entering battle phase (allows canvas to mount)
+  useEffect(() => {
+    if (phase !== 'battle') return;
+    const timer = setTimeout(() => {
+      if (recordingCanvasRef.current) {
+        startRecording(recordingCanvasRef.current);
+      }
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [phase, startRecording]);
 
-    const initial = createSimulation(names);
-    const running = { ...initial, running: true };
-    stateRef.current = running;
-    setSimState(running);
-    setPhase('battle');
-  }, []);
+  // Schedule the stop 2.5 s after the battle finishes (captures winner banner)
+  useEffect(() => {
+    if (simState?.finished) {
+      scheduleStop(2500);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [simState?.finished]);
+
+  const handleStart = useCallback(
+    (names: string[]) => {
+      // Stop any in-progress recording from a previous battle
+      stopRecording();
+      resetReady();
+
+      // Stop any existing RAF loop before switching phase
+      activeRef.current = false;
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+
+      const initial = createSimulation(names);
+      const running = { ...initial, running: true };
+      stateRef.current = running;
+      setSimState(running);
+      setPhase('battle');
+    },
+    [stopRecording, resetReady],
+  );
 
   const handlePause = useCallback(() => {
     if (!stateRef.current) return;
@@ -72,6 +106,8 @@ function App() {
   }, []);
 
   const handleReset = useCallback(() => {
+    stopRecording();
+    resetReady();
     activeRef.current = false;
     if (rafRef.current !== null) {
       cancelAnimationFrame(rafRef.current);
@@ -80,7 +116,7 @@ function App() {
     stateRef.current = null;
     setSimState(null);
     setPhase('setup');
-  }, []);
+  }, [stopRecording, resetReady]);
 
   const handleRestart = useCallback(() => {
     if (!stateRef.current) return;
@@ -101,7 +137,10 @@ function App() {
     <div className="battle-layout">
       <div className="battle-main">
         <div className="battle-header">
-          <h1 className="battle-title">⚔️ GFL2 Battle Royale</h1>
+          <div className="battle-title-row">
+            <h1 className="battle-title">⚔️ GFL2 Battle Royale</h1>
+            {isRecording && <span className="rec-badge">● REC</span>}
+          </div>
           <div className="battle-controls">
             {!simState.finished && (
               <button
@@ -116,6 +155,11 @@ function App() {
                 🔄 Rematch
               </button>
             )}
+            {isReady && (
+              <button className="btn btn-export" onClick={downloadRecording}>
+                💾 Export Video
+              </button>
+            )}
             <button className="btn btn-secondary" onClick={handleReset}>
               🏠 New Setup
             </button>
@@ -123,7 +167,7 @@ function App() {
         </div>
 
         <div className="battle-content">
-          <BattleArena state={simState} />
+          <BattleArena state={simState} canvasRef={arenaCanvasRef} />
           <div className="battle-sidebar">
             <Scoreboard bots={simState.bots} tick={simState.tick} />
             <EventLog
@@ -135,6 +179,11 @@ function App() {
           </div>
         </div>
       </div>
+      <RecordingCanvas
+        arenaCanvas={arenaCanvasRef.current}
+        state={simState}
+        onCanvas={(canvas) => { recordingCanvasRef.current = canvas; }}
+      />
     </div>
   );
 }
