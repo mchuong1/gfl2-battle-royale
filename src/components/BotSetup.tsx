@@ -98,8 +98,12 @@ export function BotSetup({ onStart }: BotSetupProps) {
   const addRandom = (count: number) => {
     const slots = Math.min(count, MAX_BOTS - selected.length);
     if (slots <= 0) return;
-    const shuffled = [...CHARACTER_LIST].sort(() => Math.random() - 0.5);
-    const picks = shuffled.slice(0, slots);
+    const pool = [...CHARACTER_LIST];
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    const picks = pool.slice(0, slots);
     setSelected((prev) => [...prev, ...picks.map((c) => ({ name: c.name, image: c.image }))]);
   };
 

@@ -4,7 +4,7 @@ import type { SimulationState } from '../types';
 
 interface BattleArenaProps {
   state: SimulationState;
-  canvasRef?: React.RefObject<HTMLCanvasElement | null>;
+  canvasRef?: RefObject<HTMLCanvasElement>;
 }
 
 const CANVAS_SIZE = 700;
@@ -216,7 +216,7 @@ export function BattleArena({ state, canvasRef: externalRef }: BattleArenaProps)
 
   return (
     <canvas
-      ref={canvasRef as RefObject<HTMLCanvasElement>}
+      ref={canvasRef}
       width={CANVAS_SIZE}
       height={CANVAS_SIZE}
       className="battle-canvas"

@@ -1,9 +1,10 @@
-import { useRef, useCallback, useState } from 'react';
+import { useRef, useCallback, useState, useEffect } from 'react';
 
 export function useRecorder() {
   const [isRecording, setIsRecording] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const blobRef = useRef<Blob | null>(null);
   const mimeTypeRef = useRef<string>('video/webm');
@@ -16,6 +17,7 @@ export function useRecorder() {
     setIsReady(false);
 
     const stream = canvas.captureStream(30);
+    streamRef.current = stream;
     const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
       ? 'video/webm;codecs=vp9'
       : 'video/webm';
@@ -28,6 +30,8 @@ export function useRecorder() {
     };
 
     recorder.onstop = () => {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
       blobRef.current = new Blob(chunksRef.current, { type: mimeType });
       setIsRecording(false);
       setIsReady(true);
@@ -45,10 +49,31 @@ export function useRecorder() {
       stopTimeoutRef.current = null;
     }
     const recorder = mediaRecorderRef.current;
-    if (!recorder) return;
-    if (recorder.state !== 'inactive') {
-      recorder.stop();
+    if (!recorder) {
+      // No recorder — still clean up any orphaned stream tracks.
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+      return;
     }
+    if (recorder.state !== 'inactive') {
+      recorder.stop(); // track cleanup happens in onstop
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      // Clean up on unmount: cancel any pending stop timeout, stop the
+      // recorder (if still running), and release all stream tracks.
+      if (stopTimeoutRef.current !== null) {
+        clearTimeout(stopTimeoutRef.current);
+      }
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== 'inactive') {
+        recorder.stop();
+      }
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    };
   }, []);
 
   const scheduleStop = useCallback(
@@ -69,7 +94,9 @@ export function useRecorder() {
     a.href = url;
     a.download = 'battle-royale.webm';
     a.click();
-    URL.revokeObjectURL(url);
+    // Revoke after a short delay so the browser has time to begin the
+    // download navigation before the object URL is invalidated.
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
   }, []);
 
   const resetReady = useCallback(() => {
