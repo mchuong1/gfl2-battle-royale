@@ -16,7 +16,7 @@ export default function SimulationCanvas({ onExportReady }: SimulationCanvasProp
   const botNodesRef = useRef<Map<number, { body: Konva.Circle; range: Konva.Circle; healthBar: Konva.Rect }>>(new Map());
   const statusRef = useRef<string>('idle');
 
-  const { bots, status, setWinner, setStatus, setBots } = useSimulationStore();
+  const { bots, status, setWinner, setStatus } = useSimulationStore();
 
   // Sync bots from store into ref on initial load / reset
   useEffect(() => {
@@ -133,13 +133,12 @@ export default function SimulationCanvas({ onExportReady }: SimulationCanvasProp
         const winner = getWinner(botsRef.current);
         setWinner(winner);
         setStatus('finished');
-        setBots([...botsRef.current]);
         animRef.current?.stop();
       }
     }, layer);
 
     animRef.current.start();
-  }, [setWinner, setStatus, setBots]);
+  }, [setWinner, setStatus]);
 
   // Start/stop animation based on status
   useEffect(() => {

@@ -17,7 +17,7 @@ const ARENA_HEIGHT = 600;
 const BOT_RADIUS = 14;
 const COMBAT_RADIUS = 36;
 const BOT_SPEED = 80; // pixels per second
-const HEALTH_DRAIN_RATE = 2; // health per second (passive)
+const HEALTH_DRAIN_RATE = 0.8; // health per second (passive) — 125 s to drain alone
 const MAX_HEALTH = 100;
 
 const BOT_COLORS = [
@@ -105,8 +105,9 @@ export function updateBots(bots: Bot[], dtSeconds: number): void {
       const combatDist = a.combatRadius + b.combatRadius;
 
       if (dist < combatDist) {
-        const damageToB = rollDice() * dtSeconds * 10;
-        const damageToA = rollDice() * dtSeconds * 10;
+        // Scale of 0.6 → avg ~2.1 health/sec per pair in combat (~30–45 s lifespan)
+        const damageToB = rollDice() * dtSeconds * 0.6;
+        const damageToA = rollDice() * dtSeconds * 0.6;
         a.health -= damageToA;
         b.health -= damageToB;
       }
