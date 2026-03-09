@@ -40,11 +40,27 @@ export function BotSetup({ onStart }: BotSetupProps) {
       'Titan', 'Cipher', 'Nexus', 'Frost', 'Ember', 'Dusk', 'Surge',
       'Phantom', 'Wraith', 'Cobra', 'Falcon', 'Wolf', 'Hawk',
       'Pyro', 'Ice', 'Thunder', 'Steel', 'Void', 'Chaos', 'Omega',
-      'Alpha', 'Delta', 'Sigma',
+      'Alpha', 'Delta', 'Sigma', 'Kira', 'Lena', 'Mira', 'Nina',
+      'Odin', 'Petra', 'Quinn', 'Rex', 'Sable', 'Tess', 'Uma',
+      'Vale', 'Wren', 'Xena', 'Yuki', 'Zara', 'Ash', 'Bay',
+      'Cruz', 'Drew', 'Erin', 'Finn', 'Gale', 'Haze', 'Iris',
+      'Jade', 'Knox', 'Lane', 'Mars', 'Nash', 'Onyx', 'Pike',
     ];
     const available = randomNames.filter((n) => !names.includes(n));
-    const toAdd = available.slice(0, Math.min(count, MAX_BOTS - names.length));
-    setNames((prev) => [...prev, ...toAdd]);
+    const slots = Math.min(count, MAX_BOTS - names.length);
+    const fromPool = available.slice(0, slots);
+    // If the named pool is exhausted, fill remaining slots with numbered bots
+    const remaining = slots - fromPool.length;
+    const numbered: string[] = [];
+    if (remaining > 0) {
+      const existingSet = new Set([...names, ...fromPool]);
+      let n = 1;
+      while (numbered.length < remaining) {
+        const candidate = `Bot-${n++}`;
+        if (!existingSet.has(candidate)) numbered.push(candidate);
+      }
+    }
+    setNames((prev) => [...prev, ...fromPool, ...numbered]);
   };
 
   return (
