@@ -1,8 +1,17 @@
 import { useRef, useCallback, useState, useEffect } from 'react';
 
+/** True when the current browser supports the APIs needed for recording. */
+function checkSupport(canvas: HTMLCanvasElement): boolean {
+  return (
+    typeof MediaRecorder !== 'undefined' &&
+    typeof canvas.captureStream === 'function'
+  );
+}
+
 export function useRecorder() {
   const [isRecording, setIsRecording] = useState(false);
   const [isReady, setIsReady] = useState(false);
+  const [recordingError, setRecordingError] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -14,40 +23,65 @@ export function useRecorder() {
 
   const startRecording = useCallback((canvas: HTMLCanvasElement) => {
     if (mediaRecorderRef.current) return;
+
+    // Feature detection — bail out gracefully on unsupported browsers.
+    if (!checkSupport(canvas)) {
+      setRecordingError('Recording is not supported in this browser.');
+      return;
+    }
+
     chunksRef.current = [];
     blobRef.current = null;
     setIsReady(false);
+    setRecordingError(null);
 
     const sessionId = ++sessionIdRef.current;
 
-    const stream = canvas.captureStream(30);
-    streamRef.current = stream;
-    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-      ? 'video/webm;codecs=vp9'
-      : 'video/webm';
+    try {
+      const stream = canvas.captureStream(30);
+      streamRef.current = stream;
+      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+        ? 'video/webm;codecs=vp9'
+        : 'video/webm';
 
-    const recorder = new MediaRecorder(stream, { mimeType });
+      const recorder = new MediaRecorder(stream, { mimeType });
 
-    recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) chunksRef.current.push(e.data);
-    };
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
 
-    recorder.onstop = () => {
+      recorder.onstop = () => {
+        streamRef.current?.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+        mediaRecorderRef.current = null;
+        // Guard against a new session starting before this onstop fires.
+        if (sessionIdRef.current !== sessionId) return;
+        // Use recorder.mimeType — the type the browser actually negotiated,
+        // which may differ from (or be a superset of) the requested mimeType.
+        blobRef.current = new Blob(chunksRef.current, { type: recorder.mimeType || mimeType });
+        setIsRecording(false);
+        setIsReady(true);
+      };
+
+      recorder.onerror = (e) => {
+        const msg = (e as Event & { error?: DOMException }).error?.message ?? 'MediaRecorder error';
+        setRecordingError(msg);
+        setIsRecording(false);
+        // Let onstop handle the rest of the cleanup when the recorder stops.
+        if (recorder.state !== 'inactive') recorder.stop();
+      };
+
+      recorder.start(100); // collect a chunk every 100 ms
+      mediaRecorderRef.current = recorder;
+      setIsRecording(true);
+    } catch (err) {
+      // captureStream() or MediaRecorder constructor threw (e.g. on iOS Safari).
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
       mediaRecorderRef.current = null;
-      // Guard against a new session starting before this onstop fires.
-      if (sessionIdRef.current !== sessionId) return;
-      // Use recorder.mimeType — the type the browser actually negotiated,
-      // which may differ from (or be a superset of) the requested mimeType.
-      blobRef.current = new Blob(chunksRef.current, { type: recorder.mimeType || mimeType });
-      setIsRecording(false);
-      setIsReady(true);
-    };
-
-    recorder.start(100); // collect a chunk every 100 ms
-    mediaRecorderRef.current = recorder;
-    setIsRecording(true);
+      setRecordingError(err instanceof Error ? err.message : 'Failed to start recording');
+      // isRecording remains false — UI never enters a broken "recording" state.
+    }
   }, []);
 
   const stopRecording = useCallback(() => {
@@ -111,5 +145,7 @@ export function useRecorder() {
     setIsReady(false);
   }, []);
 
-  return { isRecording, isReady, startRecording, stopRecording, scheduleStop, downloadRecording, resetReady };
+  const clearError = useCallback(() => setRecordingError(null), []);
+
+  return { isRecording, isReady, recordingError, startRecording, stopRecording, scheduleStop, downloadRecording, resetReady, clearError };
 }
