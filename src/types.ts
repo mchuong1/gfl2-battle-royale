@@ -1,6 +1,12 @@
+export interface BotConfig {
+  name: string;
+  image: string;
+}
+
 export interface Bot {
   id: string;
   name: string;
+  image: string;
   x: number;
   y: number;
   vx: number;

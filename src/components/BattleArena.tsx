@@ -1,15 +1,39 @@
 import { useRef, useEffect, useCallback } from 'react';
+import type { RefObject } from 'react';
 import type { SimulationState } from '../types';
 
 interface BattleArenaProps {
   state: SimulationState;
+  canvasRef?: RefObject<HTMLCanvasElement | null>;
 }
 
 const CANVAS_SIZE = 700;
 
-export function BattleArena({ state }: BattleArenaProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+export function BattleArena({ state, canvasRef: externalRef }: BattleArenaProps) {
+  const internalRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = externalRef ?? internalRef;
+  const imgCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
+  // Tracks the bot-ID fingerprint of the last preload pass so we only do
+  // image loading work when the bot roster actually changes (i.e. a new
+  // battle starts), not on every simulation tick.
+  const lastBotFingerprintRef = useRef<string>('');
 
+  useEffect(() => {
+    // Build a cheap ID-based fingerprint entirely inside the effect so no
+    // computation happens during render.  Bot IDs are stable within a battle;
+    // a new battle produces a different set of IDs.
+    const fingerprint = state.bots.map((b) => b.id).join(',');
+    if (fingerprint === lastBotFingerprintRef.current) return;
+    lastBotFingerprintRef.current = fingerprint;
+
+    for (const bot of state.bots) {
+      if (!imgCacheRef.current.has(bot.image)) {
+        const img = new Image();
+        img.src = bot.image;
+        imgCacheRef.current.set(bot.image, img);
+      }
+    }
+  }, [state.bots]);
   const draw = useCallback((s: SimulationState) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -106,17 +130,26 @@ export function BattleArena({ state }: BattleArenaProps) {
       ctx.fillStyle = glow;
       ctx.fill();
 
-      // Bot body
+      // Bot body (ring/background)
       ctx.beginPath();
       ctx.arc(x, y, botRadius, 0, Math.PI * 2);
-
       if (isFlashing) {
-        // White flash on attack
         ctx.fillStyle = '#ffffff';
       } else {
         ctx.fillStyle = bot.color;
       }
       ctx.fill();
+
+      // Portrait clipped inside circle
+      const img = imgCacheRef.current.get(bot.image);
+      if (!isFlashing && img && img.complete && img.naturalWidth > 0) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x, y, botRadius, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(img, x - botRadius, y - botRadius, botRadius * 2, botRadius * 2);
+        ctx.restore();
+      }
 
       // Bot border
       ctx.strokeStyle = isFlashing ? '#ffff00' : 'rgba(255,255,255,0.5)';

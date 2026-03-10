@@ -1,159 +1,245 @@
-import { useState } from 'react';
-import type { KeyboardEvent } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import type { BotConfig } from '../types';
+import { imageFiles } from 'virtual:public-images';
 
-const DEFAULT_NAMES = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve'];
+interface SelectedBot extends BotConfig {
+  id: string;
+}
+
+// ---------------------------------------------------------------------------
+// Character catalogue – derived at build time from filenames in public/images/.
+// To add a character, drop its image into that folder; no code changes needed.
+// ---------------------------------------------------------------------------
+interface CharacterEntry {
+  name: string;
+  image: string;
+}
+
+function filenameToEntry(filename: string): CharacterEntry {
+  // Strip prefix/suffix and _(GFL2) tag, convert remaining underscores to spaces
+  const base = filename
+    .replace(/^256px-/, '')
+    .replace(/_S\.png$/, '')
+    .replace(/_\(GFL2\)$/, '')
+    .replace(/_/g, ' ');
+  return { name: base, image: `/images/${filename}` };
+}
+
+const CHARACTER_LIST: CharacterEntry[] = imageFiles.map(filenameToEntry);
+
+// ---------------------------------------------------------------------------
 const MIN_BOTS = 2;
 const MAX_BOTS = 100;
 
 interface BotSetupProps {
-  onStart: (names: string[]) => void;
+  onStart: (bots: BotConfig[]) => void;
 }
 
 export function BotSetup({ onStart }: BotSetupProps) {
-  const [names, setNames] = useState<string[]>(DEFAULT_NAMES);
-  const [inputVal, setInputVal] = useState('');
+  const [selected, setSelected] = useState<SelectedBot[]>([]);
+  const [search, setSearch] = useState('');
+  // swapIdx: index in `selected` whose portrait is being swapped; null = picker closed
+  const [swapIdx, setSwapIdx] = useState<number | null>(null);
+  const swapPanelRef = useRef<HTMLDivElement>(null);
 
-  const addName = () => {
-    const trimmed = inputVal.trim();
-    if (!trimmed || names.length >= MAX_BOTS) return;
-    setNames((prev) => [...prev, trimmed]);
-    setInputVal('');
+  // Close swap picker on outside click
+  useEffect(() => {
+    if (swapIdx === null) return;
+    const handle = (e: MouseEvent) => {
+      if (swapPanelRef.current && !swapPanelRef.current.contains(e.target as Node)) {
+        setSwapIdx(null);
+      }
+    };
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, [swapIdx]);
+
+  const filteredChars = CHARACTER_LIST.filter((c) =>
+    c.name.toLowerCase().includes(search.toLowerCase()),
+  );
+
+  const addCharacter = (char: CharacterEntry) => {
+    if (selected.length >= MAX_BOTS) return;
+    setSelected((prev) => [...prev, { id: crypto.randomUUID(), name: char.name, image: char.image }]);
   };
 
-  const removeName = (idx: number) => {
-    setNames((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') addName();
+  const removeSelected = (idx: number) => {
+    setSelected((prev) => prev.filter((_, i) => i !== idx));
+    if (swapIdx === idx) setSwapIdx(null);
   };
 
   const updateName = (idx: number, value: string) => {
-    setNames((prev) => prev.map((n, i) => (i === idx ? value : n)));
+    setSelected((prev) => prev.map((b, i) => (i === idx ? { ...b, name: value } : b)));
   };
 
-  const canStart = names.length >= MIN_BOTS && names.every((n) => n.trim().length > 0);
+  const swapImage = (selectedIdx: number, newChar: CharacterEntry) => {
+    setSelected((prev) =>
+      prev.map((b, i) => (i === selectedIdx ? { ...b, image: newChar.image } : b)),
+    );
+    setSwapIdx(null);
+  };
 
-  const addRandomBots = (count: number) => {
-    const randomNames = [
-      'Shadow', 'Viper', 'Nova', 'Blaze', 'Storm', 'Raven', 'Ghost',
-      'Titan', 'Cipher', 'Nexus', 'Frost', 'Ember', 'Dusk', 'Surge',
-      'Phantom', 'Wraith', 'Cobra', 'Falcon', 'Wolf', 'Hawk',
-      'Pyro', 'Ice', 'Thunder', 'Steel', 'Void', 'Chaos', 'Omega',
-      'Alpha', 'Delta', 'Sigma', 'Kira', 'Lena', 'Mira', 'Nina',
-      'Odin', 'Petra', 'Quinn', 'Rex', 'Sable', 'Tess', 'Uma',
-      'Vale', 'Wren', 'Xena', 'Yuki', 'Zara', 'Ash', 'Bay',
-      'Cruz', 'Drew', 'Erin', 'Finn', 'Gale', 'Haze', 'Iris',
-      'Jade', 'Knox', 'Lane', 'Mars', 'Nash', 'Onyx', 'Pike',
-    ];
-    const available = randomNames.filter((n) => !names.includes(n));
-    const slots = Math.min(count, MAX_BOTS - names.length);
-    const fromPool = available.slice(0, slots);
-    // If the named pool is exhausted, fill remaining slots with numbered bots
-    const remaining = slots - fromPool.length;
-    const numbered: string[] = [];
-    if (remaining > 0) {
-      const existingSet = new Set([...names, ...fromPool]);
-      let n = 1;
-      while (numbered.length < remaining) {
-        const candidate = `Bot-${n++}`;
-        if (!existingSet.has(candidate)) numbered.push(candidate);
-      }
+  const addRandom = (count: number) => {
+    const slots = Math.min(count, MAX_BOTS - selected.length);
+    if (slots <= 0) return;
+    const pool = [...CHARACTER_LIST];
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
     }
-    setNames((prev) => [...prev, ...fromPool, ...numbered]);
+    const picks = pool.slice(0, slots);
+    setSelected((prev) => [...prev, ...picks.map((c) => ({ id: crypto.randomUUID(), name: c.name, image: c.image }))]);
   };
+
+  const canStart = selected.length >= MIN_BOTS && selected.every((b) => b.name.trim().length > 0);
 
   return (
     <div className="setup-container">
       <div className="setup-header">
         <h1 className="setup-title">⚔️ GFL2 Battle Royale</h1>
         <p className="setup-subtitle">
-          Enter {MIN_BOTS}–{MAX_BOTS} combatants. Last one standing wins!
+          Pick {MIN_BOTS}–{MAX_BOTS} combatants. Last one standing wins!
         </p>
       </div>
 
-      <div className="setup-card">
-        <div className="setup-actions">
-          <button
-            className="btn btn-secondary"
-            onClick={() => addRandomBots(5)}
-            disabled={names.length >= MAX_BOTS}
-          >
-            + 5 Random
-          </button>
-          <button
-            className="btn btn-secondary"
-            onClick={() => addRandomBots(10)}
-            disabled={names.length >= MAX_BOTS}
-          >
-            + 10 Random
-          </button>
-          <button
-            className="btn btn-danger"
-            onClick={() => setNames([])}
-            disabled={names.length === 0}
-          >
-            Clear All
-          </button>
-          <span className="bot-count">
-            {names.length} / {MAX_BOTS} combatants
-          </span>
-        </div>
-
-        <div className="name-input-row">
-          <input
-            type="text"
-            className="name-input"
-            placeholder="Enter combatant name…"
-            value={inputVal}
-            onChange={(e) => setInputVal(e.target.value)}
-            onKeyDown={handleKeyDown}
-            maxLength={20}
-            disabled={names.length >= MAX_BOTS}
-          />
-          <button
-            className="btn btn-primary"
-            onClick={addName}
-            disabled={!inputVal.trim() || names.length >= MAX_BOTS}
-          >
-            Add
-          </button>
-        </div>
-
-        <div className="names-list">
-          {names.map((name, idx) => (
-            <div key={idx} className="name-tag">
-              <span className="name-tag-number">{idx + 1}</span>
-              <input
-                className="name-tag-input"
-                value={name}
-                onChange={(e) => updateName(idx, e.target.value)}
-                maxLength={20}
-              />
+      <div className="setup-card setup-card--picker">
+        {/* ── LEFT: Character grid ────────────────────────────────── */}
+        <div className="picker-panel">
+          <div className="picker-panel-header">
+            <span className="picker-panel-title">Characters ({CHARACTER_LIST.length})</span>
+            <input
+              className="picker-search"
+              type="text"
+              placeholder="Search…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="char-grid">
+            {filteredChars.map((char) => (
               <button
-                className="name-tag-remove"
-                onClick={() => removeName(idx)}
-                aria-label={`Remove ${name}`}
+                key={char.image}
+                className="char-card"
+                onClick={() => addCharacter(char)}
+                disabled={selected.length >= MAX_BOTS}
+                title={`Add ${char.name}`}
               >
-                ✕
+                <img
+                  className="char-card-img"
+                  src={char.image}
+                  alt={char.name}
+                  loading="lazy"
+                />
+                <span className="char-card-name">{char.name}</span>
+              </button>
+            ))}
+            {filteredChars.length === 0 && (
+              <p className="picker-empty">No characters match "{search}"</p>
+            )}
+          </div>
+        </div>
+
+        {/* ── RIGHT: Selected list ─────────────────────────────────── */}
+        <div className="selected-panel">
+          <div className="selected-panel-header">
+            <span className="selected-panel-title">
+              Selected — {selected.length} / {MAX_BOTS}
+            </span>
+            <div className="selected-actions">
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => addRandom(5)}
+                disabled={selected.length >= MAX_BOTS}
+              >
+                +5 Rand
+              </button>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => addRandom(10)}
+                disabled={selected.length >= MAX_BOTS}
+              >
+                +10 Rand
+              </button>
+              <button
+                className="btn btn-danger btn-sm"
+                onClick={() => { setSelected([]); setSwapIdx(null); }}
+                disabled={selected.length === 0}
+              >
+                Clear
               </button>
             </div>
-          ))}
+          </div>
+
+          <div className="selected-list">
+            {selected.length === 0 && (
+              <p className="selected-empty">← Click a character to add them</p>
+            )}
+            {selected.map((bot, idx) => (
+              <div key={bot.id} className="selected-row">
+                <span className="selected-row-num">{idx + 1}</span>
+                {/* Portrait – click to open swap picker */}
+                <div className="selected-portrait-wrap">
+                  <button
+                    className="selected-portrait-btn"
+                    onClick={() => setSwapIdx(swapIdx === idx ? null : idx)}
+                    title="Click to change portrait"
+                  >
+                    <img
+                      className="selected-portrait"
+                      src={bot.image}
+                      alt={bot.name}
+                    />
+                    <span className="selected-portrait-overlay">↺</span>
+                  </button>
+                  {/* Inline swap picker */}
+                  {swapIdx === idx && (
+                    <div className="swap-picker" ref={swapPanelRef}>
+                      <p className="swap-picker-title">Choose portrait</p>
+                      <div className="swap-grid">
+                        {CHARACTER_LIST.map((char) => (
+                          <button
+                            key={char.image}
+                            className={`swap-card ${bot.image === char.image ? 'swap-card--active' : ''}`}
+                            onClick={() => swapImage(idx, char)}
+                            title={char.name}
+                          >
+                            <img src={char.image} alt={char.name} loading="lazy" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <input
+                  className="selected-name-input"
+                  value={bot.name}
+                  onChange={(e) => updateName(idx, e.target.value)}
+                  maxLength={30}
+                  placeholder="Name…"
+                />
+                <button
+                  className="selected-remove"
+                  onClick={() => removeSelected(idx)}
+                  aria-label={`Remove ${bot.name}`}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {selected.length < MIN_BOTS && selected.length > 0 && (
+            <p className="setup-warning">Need at least {MIN_BOTS} combatants to start.</p>
+          )}
+
+          <button
+            className="btn btn-start"
+            onClick={() => onStart(selected.map(({ id: _id, ...b }) => ({ ...b, name: b.name.trim() })))}
+            disabled={!canStart}
+          >
+            🚀 Start Battle!
+          </button>
         </div>
-
-        {names.length < MIN_BOTS && (
-          <p className="setup-warning">
-            Need at least {MIN_BOTS} combatants to start.
-          </p>
-        )}
-
-        <button
-          className="btn btn-start"
-          onClick={() => onStart(names.map((n) => n.trim()).filter(Boolean))}
-          disabled={!canStart}
-        >
-          🚀 Start Battle!
-        </button>
       </div>
     </div>
   );
