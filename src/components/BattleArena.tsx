@@ -13,11 +13,19 @@ export function BattleArena({ state, canvasRef: externalRef }: BattleArenaProps)
   const internalRef = useRef<HTMLCanvasElement>(null);
   const canvasRef = externalRef ?? internalRef;
   const imgCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
+  // Tracks the bot-ID fingerprint of the last preload pass so we only do
+  // image loading work when the bot roster actually changes (i.e. a new
+  // battle starts), not on every simulation tick.
+  const lastBotFingerprintRef = useRef<string>('');
 
-  // Preload portrait images; derive a stable key so this only runs when the
-  // set of image URLs actually changes, not on every tick.
-  const imageUrlKey = [...new Set(state.bots.map((b) => b.image))].sort().join('|');
   useEffect(() => {
+    // Build a cheap ID-based fingerprint entirely inside the effect so no
+    // computation happens during render.  Bot IDs are stable within a battle;
+    // a new battle produces a different set of IDs.
+    const fingerprint = state.bots.map((b) => b.id).join(',');
+    if (fingerprint === lastBotFingerprintRef.current) return;
+    lastBotFingerprintRef.current = fingerprint;
+
     for (const bot of state.bots) {
       if (!imgCacheRef.current.has(bot.image)) {
         const img = new Image();
@@ -25,8 +33,7 @@ export function BattleArena({ state, canvasRef: externalRef }: BattleArenaProps)
         imgCacheRef.current.set(bot.image, img);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imageUrlKey]);
+  }, [state.bots]);
   const draw = useCallback((s: SimulationState) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
