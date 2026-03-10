@@ -1,35 +1,15 @@
 import { useState, useRef, useEffect } from 'react';
 import type { BotConfig } from '../types';
+import { imageFiles } from 'virtual:public-images';
 
 interface SelectedBot extends BotConfig {
   id: string;
 }
 
 // ---------------------------------------------------------------------------
-// Character catalogue – derived from filenames in public/images/
+// Character catalogue – derived at build time from filenames in public/images/.
+// To add a character, drop its image into that folder; no code changes needed.
 // ---------------------------------------------------------------------------
-const RAW_FILENAMES = [
-  '256px-Alva_S.png', '256px-Andoris_S.png', '256px-Balthilde_S.png',
-  '256px-Basti_S.png', '256px-Belka_S.png', '256px-Centaureissi_(GFL2)_S.png',
-  '256px-Cheeta_S.png', '256px-Cheyanne_S.png', '256px-Colphne_S.png',
-  '256px-Daiyan_(GFL2)_S.png', '256px-Dushevnaya_(GFL2)_S.png', '256px-Faye_S.png',
-  '256px-Florence_(GFL2)_S.png', '256px-Groza_S.png', '256px-Harpsy_S.png',
-  '256px-Helen_S.png', '256px-Jiangyu_(GFL2)_S.png', '256px-Klukai_S.png',
-  '256px-Krolik_S.png', '256px-Ksenia_(GFL2)_S.png', '256px-Lainie_S.png',
-  '256px-Lenna_S.png', '256px-Leva_S.png', '256px-Lewis_(GFL2)_S.png',
-  '256px-Lind_(GFL2)_S.png', '256px-Littara_S.png', '256px-Liushih_S.png',
-  '256px-Loreley_S.png', '256px-Lotta_S.png', '256px-Makiatto_S.png',
-  '256px-Mechty_S.png', '256px-Mosin-Nagant_(GFL2)_S.png', '256px-Nagant_S.png',
-  '256px-Nemesis_S.png', '256px-Nikketa_S.png', '256px-Papasha_S.png',
-  '256px-Peri_S.png', '256px-Peritya_S.png', '256px-Phaetusa_S.png',
-  '256px-Qiongjiu_S.png', '256px-Qiuhua_S.png', '256px-Robella_S.png',
-  '256px-Sabrina_S.png', '256px-Sakura_(GFL2)_S.png', '256px-Sextans_ELMO_S.png',
-  '256px-Sharkry_S.png', '256px-Springfield_(GFL2)_S.png', '256px-Suomi_(GFL2)_S.png',
-  '256px-Tololo_S.png', '256px-Ullrid_S.png', '256px-Vector_(GFL2)_S.png',
-  '256px-Vepley_S.png', '256px-Voymastina_S.png', '256px-Yoohee_S.png',
-  '256px-Zhaohui_S.png',
-];
-
 interface CharacterEntry {
   name: string;
   image: string;
@@ -45,7 +25,7 @@ function filenameToEntry(filename: string): CharacterEntry {
   return { name: base, image: `/images/${filename}` };
 }
 
-const CHARACTER_LIST: CharacterEntry[] = RAW_FILENAMES.map(filenameToEntry);
+const CHARACTER_LIST: CharacterEntry[] = imageFiles.map(filenameToEntry);
 
 // ---------------------------------------------------------------------------
 const MIN_BOTS = 2;
