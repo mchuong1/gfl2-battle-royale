@@ -43,7 +43,11 @@ function App() {
         if (stateRef.current) {
           const next = stepSimulation(stateRef.current);
           stateRef.current = next;
-          setSimState({ ...next });
+          // Update React state every 2 ticks (~30fps UI) to halve reconciliation cost.
+          // The canvas still renders every tick via the draw() effect on state changes.
+          if (next.tick % 2 === 0 || next.finished) {
+            setSimState({ ...next });
+          }
         }
       }
       rafRef.current = requestAnimationFrame(loop);

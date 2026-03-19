@@ -115,20 +115,24 @@ export function BattleArena({ state, canvasRef: externalRef }: BattleArenaProps)
     }
 
     // --- Bots ---
+    const aliveCount = bots.reduce((n, b) => n + (b.alive ? 1 : 0), 0);
+    const showGlow = aliveCount <= 100;
     for (const bot of bots) {
       if (!bot.alive) continue;
 
       const { x, y } = bot;
       const isFlashing = bot.attackFlash > 0;
 
-      // Bot glow
-      const glow = ctx.createRadialGradient(x, y, 0, x, y, botRadius * 2.5);
-      glow.addColorStop(0, `${bot.color}55`);
-      glow.addColorStop(1, 'transparent');
-      ctx.beginPath();
-      ctx.arc(x, y, botRadius * 2.5, 0, Math.PI * 2);
-      ctx.fillStyle = glow;
-      ctx.fill();
+      // Bot glow (skipped at high bot counts for performance)
+      if (showGlow) {
+        const glow = ctx.createRadialGradient(x, y, 0, x, y, botRadius * 2.5);
+        glow.addColorStop(0, `${bot.color}55`);
+        glow.addColorStop(1, 'transparent');
+        ctx.beginPath();
+        ctx.arc(x, y, botRadius * 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = glow;
+        ctx.fill();
+      }
 
       // Bot body (ring/background)
       ctx.beginPath();

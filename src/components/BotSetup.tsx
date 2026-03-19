@@ -29,7 +29,7 @@ const CHARACTER_LIST: CharacterEntry[] = imageFiles.map(filenameToEntry);
 
 // ---------------------------------------------------------------------------
 const MIN_BOTS = 2;
-const MAX_BOTS = 100;
+const MAX_BOTS = 500;
 
 interface BotSetupProps {
   onStart: (bots: BotConfig[]) => void;

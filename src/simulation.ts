@@ -28,7 +28,10 @@ function getBotRadius(count: number): number {
   if (count <= 10) return 12;
   if (count <= 25) return 10;
   if (count <= 50) return 8;
-  return 6;
+  if (count <= 100) return 6;
+  if (count <= 200) return 5;
+  if (count <= 350) return 4;
+  return 3;
 }
 
 function getCombatRange(botRadius: number): number {
@@ -158,59 +161,84 @@ export function stepSimulation(state: SimulationState): SimulationState {
     }
   }
 
-  // --- Combat detection ---
+  // --- Combat detection (spatial grid: O(n) neighbor lookup instead of O(n²)) ---
   const aliveBots = bots.filter((b) => b.alive);
-  for (let i = 0; i < aliveBots.length; i++) {
-    for (let j = i + 1; j < aliveBots.length; j++) {
-      const a = aliveBots[i];
-      const b = aliveBots[j];
+  const cellSize = config.combatRange * 2;
+  const grid = new Map<string, Bot[]>();
+  for (const bot of aliveBots) {
+    const cx = Math.floor(bot.x / cellSize);
+    const cy = Math.floor(bot.y / cellSize);
+    const key = `${cx},${cy}`;
+    const cell = grid.get(key);
+    if (cell) cell.push(bot);
+    else grid.set(key, [bot]);
+  }
 
-      if (a.combatCooldown > 0 || b.combatCooldown > 0) continue;
+  const checkedPairs = new Set<string>();
+  for (const bot of aliveBots) {
+    const cx = Math.floor(bot.x / cellSize);
+    const cy = Math.floor(bot.y / cellSize);
+    for (let nx = cx - 1; nx <= cx + 1; nx++) {
+      for (let ny = cy - 1; ny <= cy + 1; ny++) {
+        const neighbors = grid.get(`${nx},${ny}`);
+        if (!neighbors) continue;
+        for (const other of neighbors) {
+          if (other === bot) continue;
+          const pairKey = bot.id < other.id ? `${bot.id}|${other.id}` : `${other.id}|${bot.id}`;
+          if (checkedPairs.has(pairKey)) continue;
+          checkedPairs.add(pairKey);
 
-      const dx = a.x - b.x;
-      const dy = a.y - b.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
+          const a = bot;
+          const b = other;
 
-      if (dist < config.combatRange) {
-        // Dice roll
-        const rollA = Math.floor(Math.random() * 6) + 1;
-        const rollB = Math.floor(Math.random() * 6) + 1;
+          if (a.combatCooldown > 0 || b.combatCooldown > 0) continue;
 
-        if (rollA === rollB) {
-          // Tie: small push apart, minor damage to both
-          a.health -= 3;
-          b.health -= 3;
-        } else {
-          const winner = rollA > rollB ? a : b;
-          const loser = rollA > rollB ? b : a;
-          const wRoll = rollA > rollB ? rollA : rollB;
-          const lRoll = rollA > rollB ? rollB : rollA;
+          const dx = a.x - b.x;
+          const dy = a.y - b.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
 
-          loser.health -= COMBAT_DAMAGE;
-          winner.health = Math.min(100, winner.health + COMBAT_HEAL);
-          winner.attackFlash = 12;
+          if (dist < config.combatRange) {
+            // Dice roll
+            const rollA = Math.floor(Math.random() * 6) + 1;
+            const rollB = Math.floor(Math.random() * 6) + 1;
 
-          newEvents.push({
-            id: ++eventCounter,
-            tick,
-            type: 'combat',
-            message: `⚔️ ${winner.name} [🎲${wRoll}] hit ${loser.name} [🎲${lRoll}]${loser.health <= 0 ? ' — ELIMINATED!' : ''}`,
-          });
+            if (rollA === rollB) {
+              // Tie: small push apart, minor damage to both
+              a.health -= 3;
+              b.health -= 3;
+            } else {
+              const winner = rollA > rollB ? a : b;
+              const loser = rollA > rollB ? b : a;
+              const wRoll = rollA > rollB ? rollA : rollB;
+              const lRoll = rollA > rollB ? rollB : rollA;
+
+              loser.health -= COMBAT_DAMAGE;
+              winner.health = Math.min(100, winner.health + COMBAT_HEAL);
+              winner.attackFlash = 12;
+
+              newEvents.push({
+                id: ++eventCounter,
+                tick,
+                type: 'combat',
+                message: `⚔️ ${winner.name} [🎲${wRoll}] hit ${loser.name} [🎲${lRoll}]${loser.health <= 0 ? ' — ELIMINATED!' : ''}`,
+              });
+            }
+
+            // Push bots apart
+            if (dist > 0) {
+              const nx2 = dx / dist;
+              const ny2 = dy / dist;
+              const overlap = config.combatRange - dist;
+              a.x += (nx2 * overlap) / 2;
+              a.y += (ny2 * overlap) / 2;
+              b.x -= (nx2 * overlap) / 2;
+              b.y -= (ny2 * overlap) / 2;
+            }
+
+            a.combatCooldown = COMBAT_COOLDOWN_TICKS;
+            b.combatCooldown = COMBAT_COOLDOWN_TICKS;
+          }
         }
-
-        // Push bots apart
-        if (dist > 0) {
-          const nx = dx / dist;
-          const ny = dy / dist;
-          const overlap = config.combatRange - dist;
-          a.x += (nx * overlap) / 2;
-          a.y += (ny * overlap) / 2;
-          b.x -= (nx * overlap) / 2;
-          b.y -= (ny * overlap) / 2;
-        }
-
-        a.combatCooldown = COMBAT_COOLDOWN_TICKS;
-        b.combatCooldown = COMBAT_COOLDOWN_TICKS;
       }
     }
   }
