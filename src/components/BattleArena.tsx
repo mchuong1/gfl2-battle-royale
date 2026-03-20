@@ -21,11 +21,12 @@ export function BattleArena({ state, canvasRef: externalRef }: BattleArenaProps)
   const cameraRef = useRef({ zoom: 1, cx: CANVAS_SIZE / 2, cy: CANVAS_SIZE / 2 });
 
   useEffect(() => {
-    // Build a cheap ID-based fingerprint entirely inside the effect so no
-    // computation happens during render.  Bot IDs are stable within a battle;
-    // a new battle produces a different set of IDs.
-    const fingerprint = state.bots.map((b) => b.id).join(',');
-    if (fingerprint === lastBotFingerprintRef.current) return;
+    // Build a fingerprint that covers ID, name, and image so that a Rematch
+    // with the same bot count (which reuses deterministic IDs like bot_0…)
+    // still triggers a reset whenever the roster or portraits change.
+    // Tick=0 catch handles a same-roster rematch where everything is identical.
+    const fingerprint = state.bots.map((b) => `${b.id}|${b.name}|${b.image}`).join(',');
+    if (fingerprint === lastBotFingerprintRef.current && state.tick !== 0) return;
     lastBotFingerprintRef.current = fingerprint;
     // Reset to full overview whenever a new battle starts
     cameraRef.current = { zoom: 1, cx: CANVAS_SIZE / 2, cy: CANVAS_SIZE / 2 };
@@ -38,6 +39,7 @@ export function BattleArena({ state, canvasRef: externalRef }: BattleArenaProps)
       }
     }
   }, [state.bots]);
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const draw = useCallback((s: SimulationState) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
