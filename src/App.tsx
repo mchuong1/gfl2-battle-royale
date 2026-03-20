@@ -44,7 +44,7 @@ function App() {
           const next = stepSimulation(stateRef.current);
           stateRef.current = next;
           // Update React state every 2 ticks (~30fps UI) to halve reconciliation cost.
-          // The canvas still renders every tick via the draw() effect on state changes.
+          // The canvas (via React state in BattleArena) is therefore also updated at ~30fps.
           if (next.tick % 2 === 0 || next.finished) {
             setSimState({ ...next });
           }
