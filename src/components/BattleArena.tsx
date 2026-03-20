@@ -17,6 +17,8 @@ export function BattleArena({ state, canvasRef: externalRef }: BattleArenaProps)
   // image loading work when the bot roster actually changes (i.e. a new
   // battle starts), not on every simulation tick.
   const lastBotFingerprintRef = useRef<string>('');
+  // Smoothly interpolated camera state (zoom + world-space focus point)
+  const cameraRef = useRef({ zoom: 1, cx: CANVAS_SIZE / 2, cy: CANVAS_SIZE / 2 });
 
   useEffect(() => {
     // Build a cheap ID-based fingerprint entirely inside the effect so no
@@ -25,6 +27,8 @@ export function BattleArena({ state, canvasRef: externalRef }: BattleArenaProps)
     const fingerprint = state.bots.map((b) => b.id).join(',');
     if (fingerprint === lastBotFingerprintRef.current) return;
     lastBotFingerprintRef.current = fingerprint;
+    // Reset to full overview whenever a new battle starts
+    cameraRef.current = { zoom: 1, cx: CANVAS_SIZE / 2, cy: CANVAS_SIZE / 2 };
 
     for (const bot of state.bots) {
       if (!imgCacheRef.current.has(bot.image)) {
@@ -43,9 +47,51 @@ export function BattleArena({ state, canvasRef: externalRef }: BattleArenaProps)
     const { config, bots, zoneRadius } = s;
     const { arenaX, arenaY, arenaRadius, botRadius } = config;
 
-    // --- Background ---
+    // --- Background (drawn pre-transform so it always covers the full canvas) ---
     ctx.fillStyle = '#0d0d1a';
     ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+    // --- Camera: cycle between full-arena overview and spotlight on #1 bot ---
+    const aliveBots = bots.filter((b) => b.alive);
+    const aliveCount = aliveBots.length;
+    const SPOTLIGHT_ZOOM = 4.5;
+    const DELAY_TICKS = 900;      // hold wide for ~15s before first spotlight
+    const CYCLE_TICKS = 540;      // total cycle ~9s at 60fps
+    const SPOTLIGHT_TICKS = 200;  // spotlight phase ~3.3s, wide phase ~5.7s
+
+    let targetZoom: number;
+    let targetCx: number;
+    let targetCy: number;
+
+    // Always stay at full overview for the first 15s so the initial
+    // chaos settles before we start spotlighting #1
+    const cyclePhase = s.tick < DELAY_TICKS
+      ? -1  // -1 = wide
+      : ((s.tick - DELAY_TICKS) % CYCLE_TICKS);
+    const inSpotlight = cyclePhase >= 0 && cyclePhase < SPOTLIGHT_TICKS;
+
+    if (inSpotlight && aliveCount > 0) {
+      // Zoom in on #1 (highest health)
+      const leader = aliveBots.reduce((best, b) => b.health > best.health ? b : best, aliveBots[0]);
+      targetZoom = SPOTLIGHT_ZOOM;
+      targetCx = leader.x;
+      targetCy = leader.y;
+    } else {
+      // Wide view: full arena overview
+      targetZoom = 1;
+      targetCx = arenaX;
+      targetCy = arenaY;
+    }
+
+    // Lerp camera smoothly toward target each frame
+    const cam = cameraRef.current;
+    cam.zoom += (targetZoom - cam.zoom) * 0.05;
+    cam.cx += (targetCx - cam.cx) * 0.05;
+    cam.cy += (targetCy - cam.cy) * 0.05;
+    const camTx = CANVAS_SIZE / 2 - cam.cx * cam.zoom;
+    const camTy = CANVAS_SIZE / 2 - cam.cy * cam.zoom;
+    ctx.save();
+    ctx.setTransform(cam.zoom, 0, 0, cam.zoom, camTx, camTy);
 
     // --- Outer dark area (outside arena) ---
     ctx.save();
@@ -115,7 +161,6 @@ export function BattleArena({ state, canvasRef: externalRef }: BattleArenaProps)
     }
 
     // --- Bots ---
-    const aliveCount = bots.reduce((n, b) => n + (b.alive ? 1 : 0), 0);
     const showGlow = aliveCount <= 100;
     for (const bot of bots) {
       if (!bot.alive) continue;
@@ -200,25 +245,30 @@ export function BattleArena({ state, canvasRef: externalRef }: BattleArenaProps)
       ctx.globalAlpha = 1;
     }
 
-    // --- Winner banner ---
+    // Restore camera transform — everything below is in screen space
+    ctx.restore();
+
+    // --- Winner banner (screen space, always centered regardless of zoom) ---
     if (s.finished && s.winnerId) {
       const winner = bots.find((b) => b.id === s.winnerId);
       if (winner) {
+        const bx = CANVAS_SIZE / 2;
+        const by = CANVAS_SIZE / 2;
         ctx.save();
         ctx.fillStyle = 'rgba(0,0,0,0.7)';
-        ctx.fillRect(arenaX - 180, arenaY - 40, 360, 80);
+        ctx.fillRect(bx - 180, by - 40, 360, 80);
         ctx.strokeStyle = winner.color;
         ctx.lineWidth = 3;
-        ctx.strokeRect(arenaX - 180, arenaY - 40, 360, 80);
+        ctx.strokeRect(bx - 180, by - 40, 360, 80);
 
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.font = 'bold 16px Inter, sans-serif';
         ctx.fillStyle = '#ffd700';
-        ctx.fillText('🏆 WINNER', arenaX, arenaY - 14);
+        ctx.fillText('🏆 WINNER', bx, by - 14);
         ctx.font = 'bold 24px Inter, sans-serif';
         ctx.fillStyle = winner.color;
-        ctx.fillText(winner.name, arenaX, arenaY + 14);
+        ctx.fillText(winner.name, bx, by + 14);
         ctx.restore();
       }
     }
