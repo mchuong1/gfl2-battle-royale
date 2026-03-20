@@ -164,29 +164,33 @@ export function stepSimulation(state: SimulationState): SimulationState {
   // --- Combat detection (spatial grid: O(n) neighbor lookup instead of O(n²)) ---
   const aliveBots = bots.filter((b) => b.alive);
   const cellSize = config.combatRange * 2;
-  const grid = new Map<string, Bot[]>();
-  for (const bot of aliveBots) {
+  // Numeric key avoids short-lived string allocations on the hot path.
+  const grid = new Map<number, Bot[]>();
+  // Index map lets us deduplicate pairs without a string-keyed Set.
+  const aliveIndex = new Map<Bot, number>();
+  for (let i = 0; i < aliveBots.length; i++) {
+    const bot = aliveBots[i];
+    aliveIndex.set(bot, i);
     const cx = Math.floor(bot.x / cellSize);
     const cy = Math.floor(bot.y / cellSize);
-    const key = `${cx},${cy}`;
+    const key = (cx << 16) ^ cy;
     const cell = grid.get(key);
     if (cell) cell.push(bot);
     else grid.set(key, [bot]);
   }
 
-  const checkedPairs = new Set<string>();
-  for (const bot of aliveBots) {
+  for (let bi = 0; bi < aliveBots.length; bi++) {
+    const bot = aliveBots[bi];
     const cx = Math.floor(bot.x / cellSize);
     const cy = Math.floor(bot.y / cellSize);
     for (let nx = cx - 1; nx <= cx + 1; nx++) {
       for (let ny = cy - 1; ny <= cy + 1; ny++) {
-        const neighbors = grid.get(`${nx},${ny}`);
+        const neighbors = grid.get((nx << 16) ^ ny);
         if (!neighbors) continue;
         for (const other of neighbors) {
-          if (other === bot) continue;
-          const pairKey = bot.id < other.id ? `${bot.id}|${other.id}` : `${other.id}|${bot.id}`;
-          if (checkedPairs.has(pairKey)) continue;
-          checkedPairs.add(pairKey);
+          // Only process each pair once: skip entries with equal or lower index
+          // (handles same-bot and already-visited-pair cases).
+          if ((aliveIndex.get(other) as number) <= bi) continue;
 
           const a = bot;
           const b = other;
