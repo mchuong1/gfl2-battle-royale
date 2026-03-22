@@ -15,6 +15,7 @@ const TICK_MS = 1000 / 60; // ~60fps
 
 function App() {
   const [phase, setPhase] = useState<Phase>('setup');
+  const [battleKey, setBattleKey] = useState(0);
   const [simState, setSimState] = useState<SimulationState | null>(null);
   const stateRef = useRef<SimulationState | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -62,7 +63,7 @@ function App() {
         rafRef.current = null;
       }
     };
-  }, [phase]);
+  }, [phase, battleKey]);
 
   // Start recording 200 ms after entering battle phase (allows canvas to mount)
   useEffect(() => {
@@ -99,6 +100,7 @@ function App() {
       const running = { ...initial, running: true };
       stateRef.current = running;
       setSimState(running);
+      setBattleKey((k) => k + 1);
       setPhase('battle');
     },
     [stopRecording, resetReady],
