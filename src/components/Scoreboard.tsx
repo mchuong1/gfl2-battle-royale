@@ -1,16 +1,22 @@
 import type { Bot } from '../types';
 
+const SCOREBOARD_ALIVE_LIMIT = 30;
+const SCOREBOARD_DEAD_LIMIT = 30;
+
 interface ScoreboardProps {
   bots: Bot[];
   tick: number;
 }
 
 export function Scoreboard({ bots, tick }: ScoreboardProps) {
-  const sorted = [...bots].sort((a, b) => {
-    if (a.alive !== b.alive) return a.alive ? -1 : 1;
-    if (a.alive && b.alive) return b.health - a.health;
-    return b.eliminationOrder - a.eliminationOrder;
-  });
+  const alive = bots.filter((b) => b.alive).sort((a, b) => b.health - a.health);
+  const dead = bots.filter((b) => !b.alive).sort((a, b) => b.eliminationOrder - a.eliminationOrder);
+
+  const shownAlive = alive.slice(0, SCOREBOARD_ALIVE_LIMIT);
+  const shownDead = dead.slice(0, SCOREBOARD_DEAD_LIMIT);
+  const sorted = [...shownAlive, ...shownDead];
+  const hiddenAlive = alive.length - shownAlive.length;
+  const hiddenDead = dead.length - shownDead.length;
 
   const seconds = (tick / 60).toFixed(1);
 
@@ -53,6 +59,12 @@ export function Scoreboard({ bots, tick }: ScoreboardProps) {
             )}
           </div>
         ))}
+        {(hiddenAlive > 0 || hiddenDead > 0) && (
+          <div className="scoreboard-overflow">
+            {hiddenAlive > 0 && <span>+{hiddenAlive} more alive</span>}
+            {hiddenDead > 0 && <span>+{hiddenDead} more eliminated</span>}
+          </div>
+        )}
       </div>
     </div>
   );

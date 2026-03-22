@@ -43,7 +43,11 @@ function App() {
         if (stateRef.current) {
           const next = stepSimulation(stateRef.current);
           stateRef.current = next;
-          setSimState({ ...next });
+          // Update React state every 2 ticks (~30fps UI) to halve reconciliation cost.
+          // The canvas (via React state in BattleArena) is therefore also updated at ~30fps.
+          if (next.tick % 2 === 0 || next.finished) {
+            setSimState({ ...next });
+          }
         }
       }
       rafRef.current = requestAnimationFrame(loop);
