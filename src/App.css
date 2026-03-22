@@ -753,6 +753,38 @@
 .selected-name-input:focus { border-bottom-color: #4361ee; color: #fff; }
 .selected-name-input::placeholder { color: #555; }
 
+.count-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.count-stepper-btn {
+  background: #1a1a2e;
+  border: 1px solid #3a3a5e;
+  color: #aaa;
+  font-size: 0.85rem;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  cursor: pointer;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+.count-stepper-btn:hover:not(:disabled) { color: #fff; border-color: #4361ee; }
+.count-stepper-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.count-stepper-value {
+  min-width: 22px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: #ccc;
+  font-variant-numeric: tabular-nums;
+}
+
 .selected-remove {
   background: transparent;
   border: none;

@@ -4,6 +4,7 @@ import { imageFiles } from 'virtual:public-images';
 
 interface SelectedBot extends BotConfig {
   id: string;
+  count: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -58,9 +59,11 @@ export function BotSetup({ onStart }: BotSetupProps) {
     c.name.toLowerCase().includes(search.toLowerCase()),
   );
 
+  const totalCount = selected.reduce((sum, b) => sum + b.count, 0);
+
   const addCharacter = (char: CharacterEntry) => {
-    if (selected.length >= MAX_BOTS) return;
-    setSelected((prev) => [...prev, { id: crypto.randomUUID(), name: char.name, image: char.image }]);
+    if (totalCount >= MAX_BOTS) return;
+    setSelected((prev) => [...prev, { id: crypto.randomUUID(), name: char.name, image: char.image, count: 1 }]);
   };
 
   const removeSelected = (idx: number) => {
@@ -72,6 +75,17 @@ export function BotSetup({ onStart }: BotSetupProps) {
     setSelected((prev) => prev.map((b, i) => (i === idx ? { ...b, name: value } : b)));
   };
 
+  const updateCount = (idx: number, delta: number) => {
+    setSelected((prev) => {
+      const totalOthers = prev.reduce((sum, b, i) => (i === idx ? sum : sum + b.count), 0);
+      return prev.map((b, i) =>
+        i === idx
+          ? { ...b, count: Math.max(1, Math.min(b.count + delta, MAX_BOTS - totalOthers)) }
+          : b,
+      );
+    });
+  };
+
   const swapImage = (selectedIdx: number, newChar: CharacterEntry) => {
     setSelected((prev) =>
       prev.map((b, i) => (i === selectedIdx ? { ...b, image: newChar.image } : b)),
@@ -80,18 +94,21 @@ export function BotSetup({ onStart }: BotSetupProps) {
   };
 
   const addRandom = (count: number) => {
-    const slots = Math.min(count, MAX_BOTS - selected.length);
-    if (slots <= 0) return;
-    const pool = [...CHARACTER_LIST];
-    for (let i = pool.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [pool[i], pool[j]] = [pool[j], pool[i]];
-    }
-    const picks = pool.slice(0, slots);
-    setSelected((prev) => [...prev, ...picks.map((c) => ({ id: crypto.randomUUID(), name: c.name, image: c.image }))]);
+    setSelected((prev) => {
+      const currentTotal = prev.reduce((sum, b) => sum + b.count, 0);
+      const slots = Math.min(count, MAX_BOTS - currentTotal);
+      if (slots <= 0) return prev;
+      const pool = [...CHARACTER_LIST];
+      for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+      }
+      const picks = pool.slice(0, slots);
+      return [...prev, ...picks.map((c) => ({ id: crypto.randomUUID(), name: c.name, image: c.image, count: 1 }))];
+    });
   };
 
-  const canStart = selected.length >= MIN_BOTS && selected.every((b) => b.name.trim().length > 0);
+  const canStart = totalCount >= MIN_BOTS && selected.every((b) => b.name.trim().length > 0);
 
   return (
     <div className="setup-container">
@@ -121,7 +138,7 @@ export function BotSetup({ onStart }: BotSetupProps) {
                 key={char.image}
                 className="char-card"
                 onClick={() => addCharacter(char)}
-                disabled={selected.length >= MAX_BOTS}
+                disabled={totalCount >= MAX_BOTS}
                 title={`Add ${char.name}`}
               >
                 <img
@@ -143,20 +160,20 @@ export function BotSetup({ onStart }: BotSetupProps) {
         <div className="selected-panel">
           <div className="selected-panel-header">
             <span className="selected-panel-title">
-              Selected — {selected.length} / {MAX_BOTS}
+              Selected — {totalCount} / {MAX_BOTS}
             </span>
             <div className="selected-actions">
               <button
                 className="btn btn-secondary btn-sm"
                 onClick={() => addRandom(5)}
-                disabled={selected.length >= MAX_BOTS}
+                disabled={totalCount >= MAX_BOTS}
               >
                 +5 Rand
               </button>
               <button
                 className="btn btn-secondary btn-sm"
                 onClick={() => addRandom(10)}
-                disabled={selected.length >= MAX_BOTS}
+                disabled={totalCount >= MAX_BOTS}
               >
                 +10 Rand
               </button>
@@ -217,6 +234,21 @@ export function BotSetup({ onStart }: BotSetupProps) {
                   maxLength={30}
                   placeholder="Name…"
                 />
+                <div className="count-stepper">
+                  <button
+                    className="count-stepper-btn"
+                    onClick={() => updateCount(idx, -1)}
+                    disabled={bot.count <= 1}
+                    aria-label="Decrease count"
+                  >−</button>
+                  <span className="count-stepper-value">{bot.count}</span>
+                  <button
+                    className="count-stepper-btn"
+                    onClick={() => updateCount(idx, 1)}
+                    disabled={totalCount >= MAX_BOTS}
+                    aria-label="Increase count"
+                  >+</button>
+                </div>
                 <button
                   className="selected-remove"
                   onClick={() => removeSelected(idx)}
@@ -234,7 +266,7 @@ export function BotSetup({ onStart }: BotSetupProps) {
 
           <button
             className="btn btn-start"
-            onClick={() => onStart(selected.map(({ id: _id, ...b }) => ({ ...b, name: b.name.trim() })))}
+            onClick={() => onStart(selected.flatMap(({ count, name, image }) => Array.from({ length: count }, () => ({ name: name.trim(), image }))))}
             disabled={!canStart}
           >
             🚀 Start Battle!
