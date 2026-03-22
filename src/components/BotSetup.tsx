@@ -260,7 +260,7 @@ export function BotSetup({ onStart }: BotSetupProps) {
             ))}
           </div>
 
-          {selected.length < MIN_BOTS && selected.length > 0 && (
+          {totalCount < MIN_BOTS && totalCount > 0 && (
             <p className="setup-warning">Need at least {MIN_BOTS} combatants to start.</p>
           )}
 
